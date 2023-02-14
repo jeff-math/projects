@@ -1,0 +1,41 @@
+---
+title: "Stat 420 Final Project- Group 51"
+author: Jefferson Mathews- jrm10, David Lin - yiyangl7, Vidushi Somani - vsomani3,
+  Benny Zhao - bzhao22
+date: "4/16/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Dataset
+
+```{r}
+library(readr)
+Stat_420_Final_Data <- read_csv("C:/Users/jeffe/Downloads/Stat 420 Final Data.csv")
+
+Stat_420_Final_Data[1:10]
+```
+
+## Proposal Title: Examining New Age Analytics of European soccer
+
+**Description of Dataset:**
+Description of Dataset: This data contains statistics on 4 European Leagues during the 17-18, 18-19, and 19-20 seasons. Possible response variables that could be used are points and wins. Numeric predictors that will be used include possession (out of 100%), expected goals, expected goal differential, and expected assists. These variables also are measured in per 90 averages by dividing every team's total by the number of games played (which was 38 for all 80 teams). Two categorical predictors that will be used is the result of the season (measured by relegation, european spot, or neither) and country.
+
+**Dataset Background & Citation of Source:**
+
+Dataset Background & Citation of Source: The four leagues we are using are the EPL, La Liga, Serie A, and Ligue 1. These are the highest levels of professional soccer in England, Spain, Italy, and France respectively. The data uses stats from the 2017-2018 and 2018-2019 for all 4 leagues. As well as stats for the 2019-2020 season for England and Italy
+The dataset that we plan to use in our analysis can be found at fbref.com with links to the following leagues:
+France: https://fbref.com/en/comps/13/history/Ligue-1-Seasons
+England: https://fbref.com/en/comps/9/history/Premier-League-Seasons
+Italy: https://fbref.com/en/comps/11/history/Serie-A-Seasons
+Spain: https://fbref.com/en/comps/12/history/La-Liga-Seasons
+
+
+**Statement of Interest:** We are interested in how the performance trends of a team affect the outcome of the season. Specifically, we plan to analyze the data using predictors to identify what stats best predict success in these leagues.
+
+**Group Pledge:** We pledge to contribute and delegate work fairly. Our primary method of contact is Text Message, but we will use Zoom to meet weekly. Our current plan is to meet on Wednesdays and Sundays for the next couple of weeks to delegate work and discuss how to move forward.

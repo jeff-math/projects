@@ -1,0 +1,522 @@
+---
+title: "STAT425 Final Project"
+author: "Paul Holaway, Jefferson Mathews, Rebecca Oberhelman"
+date: "10/27/2021"
+output: html_document
+---
+
+Renaming Variables for Convenience
+```{r}
+library(tidyverse)
+Real_Estate = Real_Estate %>%
+  rename(Trans_Date = 'X1 transaction date') %>%
+  rename(House_Age = 'X2 house age') %>%
+  rename(MRT_Dist = 'X3 distance to the nearest MRT station') %>%
+  rename(Conv_Store_No = 'X4 number of convenience stores') %>%
+  rename(Latitude = 'X5 latitude') %>%
+  rename(Longitude = 'X6 longitude') %>%
+  rename(House_Price_Unit_Area = 'Y house price of unit area')
+```
+
+Extracting the month "X7"
+```{r}
+Real_Estate = Real_Estate %>%
+  mutate(Trans_Month = round((Trans_Date - floor(Trans_Date)), digits = 3)) %>%
+  mutate(Trans_Month = ifelse(Trans_Month == 0.083, "January",
+                       ifelse(Trans_Month == 0.167, "February",
+                       ifelse(Trans_Month == 0.250, "March",
+                       ifelse(Trans_Month == 0.333, "April",
+                       ifelse(Trans_Month == 0.417, "May",
+                       ifelse(Trans_Month == 0.500, "June",
+                       ifelse(Trans_Month == 0.583, "July",
+                       ifelse(Trans_Month == 0.667, "August",
+                       ifelse(Trans_Month == 0.750, "September",
+                       ifelse(Trans_Month == 0.833, "October",
+                       ifelse(Trans_Month == 0.917, "November",
+                       ifelse(Trans_Month == 0.000, "December",
+                       Trans_Month))))))))))))) %>%
+  mutate(Trans_Year = floor(Trans_Date))
+```
+
+Exploratory Data Analysis
+Numerical Summaries
+```{r}
+summary(Real_Estate)
+```
+
+Scatter Plot Matrix
+```{r}
+pairs(House_Price_Unit_Area ~ Trans_Date + House_Age + MRT_Dist + Conv_Store_No + Latitude + Longitude, data = Real_Estate, main = "Scatter Plot Matrix of Real Estate Data")
+```
+Categorical Variables / Factors
+- Conv_Store_No
+- Month (Not Show Above)
+
+Numerical Variables
+- House_Age
+- MRT_Dist
+- Latitude
+- Longitude
+
+Frequency of Month
+```{r}
+library(ggplot2)
+ggplot(Real_Estate, aes(Trans_Month)) +
+  geom_bar(fill = "#003d7c")
+```
+**Interesting how it's the beginning of the year and end spring/beginning of summer.**
+
+**January is due to bonuses being given out right before Chinese New Year.**
+
+Histogram of Transaction Date
+```{r}
+hist(Real_Estate$Trans_Date, xlab = "Transaction Date", main = "Histogram of Transaction Date")
+```
+**Unusual spike in May, 2013.**
+
+Histogram of House Age
+```{r}
+hist(Real_Estate$House_Age, xlab = "House Age", main = "Histogram of House Age")
+```
+**The majority of the houses are less than 20 years old.**
+
+Histogram of MRT Distance
+```{r}
+hist(Real_Estate$MRT_Dist, xlab = "MRT Distance", main = "Histogram of MRT Distance")
+```
+**The vast majority of the distances are below 1,000 m due to the mountainous terrain and less people living in the mountains.**
+
+Frequency of Conveniece Stores
+```{r}
+ggplot(Real_Estate, aes(Conv_Store_No)) +
+  geom_bar(fill = "#003d7c")
+```
+**Possibly more stores means a more cramped block? It appears that this variable does not affect our housing unit per area price.** 
+
+Histogram of Latitude
+```{r}
+hist(Real_Estate$Latitude, xlab = "Latitude", main = "Histogram of Latitude")
+```
+**Capital city (Taipei) is on the northern part of the island. The peak is around the latitude of the most densly part of the capital.**
+
+Histogram of Longitude
+```{r}
+hist(Real_Estate$Longitude, xlab = "Longitude", main = "Histogram of Longitude")
+```
+**Western portion is more densly populated due to the eastern and central having mountainous terrain. The peak is around the longitude of the most densly part of the capital. log-transform this.**
+
+Histogram of Housing Price per Unit Area
+```{r}
+hist(Real_Estate$House_Price_Unit_Area, xlab = "Housig Price per Unit Area", main = "Histogram of Housing Price per Unit Area")
+```
+**log-transform this**
+
+First attempt at MLR Model.
+```{r}
+M1 = lm(House_Price_Unit_Area ~ Trans_Date + House_Age + MRT_Dist + Conv_Store_No + Latitude + Longitude, data = Real_Estate)
+summary(M1)
+```
+**Check for transformation of the Y.**
+
+```{r}
+library(MASS)
+Y.trans = boxcox(PM1, lambda=seq(0, 1, length=400))
+Y.trans$x[Y.trans$y == max(Y.trans$y)]
+```
+**Log transform Y because leaving it untransformed is clearly not a good idea. While log transforming is not within the 95% CI, it is the closest intuitive transformation.**
+
+Second attempt at the MLR Model.
+```{r}
+M2 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + MRT_Dist + Conv_Store_No + Latitude + Longitude, data = Real_Estate)
+summary(M2)
+```
+**Use log(House_Price_Unit_area) due to the massive increase in R-squared, the massive decrease in the RSE, and the intercept is now more significant.**
+
+Residual Plot for the Second MLR Model.
+```{r}
+plot(fitted(M2), residuals(M2), xlab = "Fitted Values", ylab = "Residuals", main = "Residual Plot of Second MLR Model")
+abline(0, 0)
+```
+**Residuals look pretty good, however, trying out log-transformation of MRT_Dist and Longitude.**
+
+Histogram of log(MRT_Dist) and new MLR Model with Residual Plot.
+```{r}
+hist(log(Real_Estate$MRT_Dist), xlab = "log(MRT_Dist)", main = "Histogram of the log-transformed MRT_Distance")
+
+M3 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + log(MRT_Dist) + Conv_Store_No + Latitude + Longitude, data = Real_Estate)
+summary(M3)
+
+plot(fitted(M3), residuals(M3), xlab = "Fitted Values", ylab = "Residuals", main = "Residual Plot of Third MLR Model")
+abline(0, 0)
+```
+**This is a better model. The RSE is lower, the R-squared is higher, and we now have all terms significant at alpha = 0.05. Conv_Store_No has gone down, however log(MRT_Dist) is significantly more significant and Longitude is now significant. The residual plot is now much nicer looking.**
+
+Histogram of log(Longitude) and new MLR Model with Residual Plot.
+```{r}
+hist(log(Real_Estate$Longitude), xlab = "log(Longitude)", main = "Histogram of the log-transformed Longitude")
+
+M4 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + log(MRT_Dist) + Conv_Store_No + Latitude + log(Longitude), data = Real_Estate)
+summary(M4)
+
+plot(fitted(M4), residuals(M4), xlab = "Fitted Values", ylab = "Residuals", main = "Residual Plot of Fourth MLR Model")
+abline(0, 0)
+```
+**There does not appear to be any significant changes in the significances anywhere. The only advantage of keeping log(Longitude) is that it is not multimodal anymore.**
+
+Diagnostics
+1. Checking for High Leverage Points
+```{r}
+library(faraway)
+n1 = 414
+p1 = 10
+lev1 = influence(M4)$hat
+lev1 = lev1[lev1>2*p1/n1]
+lev1
+halfnorm(influence(M4)$hat, labs = row.names(Real_Estate), ylab = "Leverages", main = "M4")
+```
+**There are a grand total of 4 different observations that are high leverage observations in M4.**
+
+2. Checking for Outliers
+```{r}
+jack1 = rstudent(M4)
+qt(0.05/(2*n1), 407, lower.tail = FALSE)
+sort(abs(jack2), decreasing=TRUE)[1:5]
+sort(abs(jack3), decreasing=TRUE)[1:5]
+```
+**We have three different outliers for the model. They are observations 114, 149, and 271.**
+
+3. Checking the Cook's Distance for highly influential points.
+```{r}
+Cook1 = cooks.distance(M4)
+max(Cook1)
+halfnorm(Cook1, labs=row.names(Real_Estate), ylab="Cook's Distances for M4", main = "M4")
+```
+**Cook's Distance does not appear to return us any influential points that are outliers for both models because the highest Cook's Distance is 0.0884 < 1.**
+
+4. Checking for Heteroskedasticity
+```{r}
+library(lmtest)
+bptest(M4)
+```
+**According to the BP Test, we fail to reject the null hypothesis of homoskedasticity for the model.**
+
+5. Checking for Normality of Residuals
+```{r}
+shapiro.test(M4$residuals)
+```
+**According to the SW Test, we reject the null hypothesis that the model residuals are normally distributed.**
+
+6. Checking for Correlation in the Errors
+```{r}
+dwtest(M4)
+```
+**According to the DW Test, we fail to reject the null hypothesis that the autocorrelation is equal to 0 for the model.**
+
+7. Checking AV-Plots for further model structure checking. (M4)
+```{r}
+r.yTrans_Date = update(M4, ~. - Trans_Date)$res;
+r.Trans_Date = lm(Trans_Date ~., data=Real_Estate[,-1])$res;
+tmp1=lm(r.yTrans_Date ~ r.Trans_Date)
+
+r.yHouse_Age = update(M4, ~. - House_Age)$res;
+r.House_Age = lm(House_Age ~., data=Real_Estate[,-1])$res;
+tmp2=lm(r.yHouse_Age ~ r.House_Age)
+
+r.ylog_MRT_Dist = update(M4, ~. - log(MRT_Dist))$res;
+r.log_MRT_Dist = lm(log(MRT_Dist) ~., data=Real_Estate[,-1])$res;
+tmp3=lm(r.ylog_MRT_Dist ~ r.log_MRT_Dist)
+
+r.yConv_Store_No = update(M4, ~. - Conv_Store_No)$res;
+r.Conv_Store_No = lm(Conv_Store_No ~., data=Real_Estate[,-1])$res;
+tmp4=lm(r.yConv_Store_No ~ r.Conv_Store_No)
+
+r.yLatitude = update(M4, ~. - Latitude)$res;
+r.Latitude = lm(Latitude ~., data=Real_Estate[,-1])$res;
+tmp5=lm(r.yLatitude ~ r.Latitude)
+
+r.ylog_Longitude = update(M4, ~. - log(Longitude))$res;
+r.log_Longitude = lm(log(Longitude) ~., data=Real_Estate[,-1])$res;
+tmp6=lm(r.ylog_Longitude ~ r.log_Longitude)
+
+par(mfrow=c(2,3))
+plot(r.Trans_Date, r.yTrans_Date, xlab="Trans_Date Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp1)
+plot(r.House_Age, r.yHouse_Age, xlab="House_Age Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp2)
+plot(r.log_MRT_Dist, r.ylog_MRT_Dist, xlab="log(MRT_Dist) Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp3)
+plot(r.Conv_Store_No, r.yConv_Store_No, xlab="Conv_Store_No Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp4)
+plot(r.Latitude, r.yLatitude, xlab="Latitdue Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp5)
+plot(r.log_Longitude, r.ylog_Longitude, xlab="log(Longitude) Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp6)
+```
+
+8. Collinearity (M4)
+```{r}
+#Condition Number
+x1 = model.matrix(M4)[,-1]
+#Standardize Matrix Columns
+x1 = x1 - matrix(apply(x1, 2, mean), 414,6, byrow=TRUE)
+x1 = x1 / matrix(apply(x1, 2, sd), 414,6, byrow=TRUE)
+e1 = eigen(t(x1) %*% x1)
+sqrt(e1$val[1]/e1$val)
+
+#Variance Inflation Factor
+round(vif(x1), dig=2)
+#Square Rooting
+sqrt(round(vif(x1), digits = 2))
+```
+**The Condition Number = 3.25, so we do not seem to have collinearity. The highest VIF = 2.74, so the highest standard error is 1.66 times higher than without collinearity.**
+
+First and second attempt at Alternative Model.
+```{r}
+PM1 = lm(House_Price_Unit_Area ~ Trans_Date + House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + Longitude + factor(Trans_Month) + factor(Trans_Year), data = Real_Estate)
+summary(PM1)
+#Releveling Trans_Month so that January is the base.
+Month = relevel(factor(Real_Estate$Trans_Month), ref = "January")
+#Remove Trans_Year as it is Collinear with Trans_Date
+PM2 = lm(House_Price_Unit_Area ~ Trans_Date + House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + Longitude + Month, data = Real_Estate)
+summary(PM2)
+```
+
+Residual Plot of First Attempted Alternative Model
+```{r}
+plot(fitted(PM2), residuals(PM2), xlab = "Fitted Values", ylab = "Residuals", main = "Residual Plot of Full Model")
+abline(0, 0)
+```
+
+Second Attempt at Alternative Model (Without factor(Trans_Month))
+```{r}
+PM3 = lm(House_Price_Unit_Area ~ Trans_Date + House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + Longitude, data = Real_Estate)
+summary(PM3)
+anova(PM3,PM2)
+```
+**ANOVA comparison of models test shows that reduced model is adequate.**
+
+```{r}
+Y.trans = boxcox(PM3, lambda=seq(0, 1, length=400))
+Y.trans$x[Y.trans$y == max(Y.trans$y)]
+```
+**While lambda = 0 is not within the 95% CI, it is the closest transformation that makes practical sense.**
+
+```{r}
+PM4 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + Longitude, data = Real_Estate)
+summary(PM4)
+```
+**The intercept and Trans_Date are better, the R-squared is higher, and the Conv_Store_No factors have more significance in their levels. However, we lose Longitude's significance.**
+
+```{r}
+plot(fitted(PM4), residuals(PM4), xlab = "Fitted Values", ylab = "Residuals", main = "Residual Plot of Full Model")
+abline(0, 0)
+```
+**Residuals look a little better when using log(Y).**
+
+Third Attempt at Alternative Model using log(Longitude)
+```{r}
+PM5 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + log(Longitude), data = Real_Estate)
+summary(PM5)
+```
+**We are considering dropping longitude from the model.**
+
+Fourth attempt at Alternative Model dropping longitude.
+```{r}
+PM6 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude, data = Real_Estate)
+summary(PM6)
+anova(PM6,PM4)
+```
+**The reduced model without longitude in it is adequate according to the ANOVA test. Possibly due to similar prices in longitude? Could also possibly be due to the range of Longitude being 0.09274º.**
+
+Swapping out the date as a continuous variable (Trans_Date) to categorical interactions.
+```{r}
+PM7 = lm(log(House_Price_Unit_Area) ~ House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + factor(Trans_Year) + factor(Trans_Month) + Trans_Year:Month, data = Real_Estate)
+#We removed Trans_Year:Trans_Month as it turns out to be perfectly collinear with Trans_Year and Trans_Month.
+PM8 = lm(log(House_Price_Unit_Area) ~ House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + factor(Trans_Year) + Month, data = Real_Estate)
+summary(PM8)
+```
+
+```{r}
+PM9 = lm(log(House_Price_Unit_Area) ~ House_Age + MRT_Dist + factor(Conv_Store_No) + Latitude + Trans_Year:Month, data = Real_Estate)
+summary(PM9)
+```
+**The Trans_Year:Trans_Month interaction does not seem significant in the majority of the coefficients so we decided to remove it since we were not including the factors of Trans_Month and Trans_Year separately. Plus, the R-squared, RSE, and p-value of the F-stat are all the same.**
+
+ANOVA Test for the continuous time vs. the factored times.
+```{r}
+anova(PM6, PM8)
+```
+**The reduced model using time as a continuous predictor is adequate according to the ANOVA test. This is the last attempt to use the factored Month and Year in our second model.**
+
+Checking for transformations of the variable MRT_Dist.
+```{r}
+hist(log(Real_Estate$MRT_Dist), xlab = "log(MRT_Dist)", main = "Histogram of the log-transformed MRT_Distance")
+PM10 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + log(MRT_Dist) + factor(Conv_Store_No) + Latitude, data = Real_Estate)
+summary(PM10)
+```
+**log(MRT_Dist) is much more normally distributed than before. However, we lose most of the significance from the Conv_Store_No coefficients. We will run diagnostics on this model.**
+
+Adding back in Longitude to check since we log(MRT_Dist).
+```{r}
+PM11 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + log(MRT_Dist) + factor(Conv_Store_No) + Latitude + Longitude, data = Real_Estate)
+summary(PM11)
+anova(PM10, PM11)
+#Checking for log(Longitude)
+hist(log(Real_Estate$Longitude), xlab = "Longitude", main = "Histogram of the log-transformed Longitude")
+PM12 = lm(log(House_Price_Unit_Area) ~ Trans_Date + House_Age + log(MRT_Dist) + factor(Conv_Store_No) + Latitude + log(Longitude), data = Real_Estate)
+summary(PM12)
+anova(PM10, PM12)
+```
+**Keep Longitude in the model and use log(Longitude) for being closer to a normal distribution. It is not multimodal like its untransformed histogram.**
+
+Diagnostics
+1. Checking for High Leverage Points
+```{r}
+library(faraway)
+n2 = 414
+p2 = 10
+lev2 = influence(PM10)$hat
+lev3 = influence(PM12)$hat
+lev2 = lev2[lev2>2*p2/n2]
+lev3 = lev3[lev3>2*p2/n2]
+lev2
+lev3
+par(mfrow=c(1,2))
+halfnorm(influence(PM10)$hat, labs = row.names(Real_Estate), ylab = "Leverages", main = "PM10")
+halfnorm(influence(PM12)$hat, labs = row.names(Real_Estate), ylab = "Leverages", main = "PM11")
+```
+**There are a grand total of 51 different observations that are high leverage observations in PM10 and 70 different observations that are high leverage observations in PM11.**
+
+2. Checking for Outliers
+```{r}
+jack2 = rstudent(PM10)
+jack3 = rstudent(PM12)
+qt(0.05/(2*n2), 399, lower.tail = FALSE)
+qt(0.05/(2*n2), 398, lower.tail = FALSE)
+sort(abs(jack2), decreasing=TRUE)[1:5]
+sort(abs(jack3), decreasing=TRUE)[1:5]
+```
+**We have three different outliers from both models. They are observations 114, 149, and 271.**
+
+3. Checking the Cook's Distance for highly influential points.
+```{r}
+Cook2 = cooks.distance(PM10)
+Cook3 = cooks.distance(PM12)
+max(Cook2)
+max(Cook3)
+par(mfrow=c(1,2))
+halfnorm(Cook2, labs=row.names(Real_Estate), ylab="Cook's Distances for PM10", main = "PM10")
+halfnorm(Cook3, labs=row.names(Real_Estate), ylab="Cook's Distances for PM11", main = "PM11")
+```
+**Cook's Distance does not appear to return us any influential points that are outliers for both models because the highest Cook's Distance is 0.1297 < 1. Interesting how observation 114 has the highest Cook's Distances for both.**
+
+4. Checking for Heteroskedasticity
+```{r}
+library(lmtest)
+bptest(PM10)
+bptest(PM12)
+```
+**According to the BP Test, we fail to reject the null hypothesis of homoskedasticity for both.**
+
+5. Checking for Normality of Residuals
+```{r}
+shapiro.test(PM10$residuals)
+shapiro.test(PM12$residuals)
+```
+**According to the SW Test, we reject the null hypothesis that both models residuals are normally distributed. However, PM11 is slightly better, but by a miniscule amount.**
+
+6. Checking for Correlation in the Errors
+```{r}
+dwtest(PM10)
+dwtest(PM12)
+```
+**According to the DW Test, we fail to reject the null hypothesis that the autocorrelation is equal to 0 for both models.**
+
+7a. Checking AV-Plots for further model structure checking. (PM10)
+```{r}
+r.yTrans_Date = update(PM10, ~. - Trans_Date)$res;
+r.Trans_Date = lm(Trans_Date ~., data=Real_Estate[,-1])$res;
+tmp1=lm(r.yTrans_Date ~ r.Trans_Date)
+
+r.yHouse_Age = update(PM10, ~. - House_Age)$res;
+r.House_Age = lm(House_Age ~., data=Real_Estate[,-1])$res;
+tmp2=lm(r.yHouse_Age ~ r.House_Age)
+
+r.ylog_MRT_Dist = update(PM10, ~. - log(MRT_Dist))$res;
+r.log_MRT_Dist = lm(log(MRT_Dist) ~., data=Real_Estate[,-1])$res;
+tmp3=lm(r.ylog_MRT_Dist ~ r.log_MRT_Dist)
+
+r.yLatitude = update(PM10, ~. - Latitude)$res;
+r.Latitude = lm(Latitude ~., data=Real_Estate[,-1])$res;
+tmp4=lm(r.yLatitude ~ r.Latitude)
+
+par(mfrow=c(2,2))
+plot(r.Trans_Date, r.yTrans_Date, xlab="Trans_Date Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp1)
+plot(r.House_Age, r.yHouse_Age, xlab="House_Age Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp2)
+plot(r.log_MRT_Dist, r.ylog_MRT_Dist, xlab="log(MRT_Dist) Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp3)
+plot(r.Latitude, r.yLatitude, xlab="Latitdue Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp4)
+```
+
+7b. Checking AV-Plots for further model structure checking. (PM12)
+```{r}
+r.yTrans_Date = update(PM12, ~. - Trans_Date)$res;
+r.Trans_Date = lm(Trans_Date ~., data=Real_Estate[,-1])$res;
+tmp1=lm(r.yTrans_Date ~ r.Trans_Date)
+
+r.yHouse_Age = update(PM12, ~. - House_Age)$res;
+r.House_Age = lm(House_Age ~., data=Real_Estate[,-1])$res;
+tmp2=lm(r.yHouse_Age ~ r.House_Age)
+
+r.ylog_MRT_Dist = update(PM12, ~. - log(MRT_Dist))$res;
+r.log_MRT_Dist = lm(log(MRT_Dist) ~., data=Real_Estate[,-1])$res;
+tmp3=lm(r.ylog_MRT_Dist ~ r.log_MRT_Dist)
+
+r.yLatitude = update(PM12, ~. - Latitude)$res;
+r.Latitude = lm(Latitude ~., data=Real_Estate[,-1])$res;
+tmp4=lm(r.yLatitude ~ r.Latitude)
+
+r.ylog_Longitude = update(PM12, ~. - Longitude)$res;
+r.log_Longitude = lm(log(Longitude) ~., data=Real_Estate[,-1])$res;
+tmp5=lm(r.ylog_Longitude ~ r.log_Longitude)
+
+par(mfrow=c(2,2))
+plot(r.Trans_Date, r.yTrans_Date, xlab="Trans_Date Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp1)
+plot(r.House_Age, r.yHouse_Age, xlab="House_Age Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp2)
+plot(r.log_MRT_Dist, r.ylog_MRT_Dist, xlab="log(MRT_Dist) Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp3)
+plot(r.Latitude, r.yLatitude, xlab="Latitude Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp4)
+plot(r.log_Longitude, r.ylog_Longitude, xlab="log(Longitude) Residuals", ylab="log(House_Price_Unit_Area) Residuals"); abline(tmp5)
+```
+
+8a. Collinearity (PM10)
+```{r}
+#Condition Number
+x2 = model.matrix(PM10)[,-1]
+#Standardize Matrix Columns
+x2 = x2 - matrix(apply(x2, 2, mean), 414,14, byrow=TRUE)
+x2 = x2 / matrix(apply(x2, 2, sd), 414,14, byrow=TRUE)
+e2 = eigen(t(x2) %*% x2)
+sqrt(e2$val[1]/e2$val)
+
+#Variance Inflation Factor
+round(vif(x2), dig=2)
+#Square Rooting
+sqrt(round(vif(x2), digits = 2))
+```
+**The Condition Number = 4.287, so we do not seem to have collinearity. The highest VIF = 2.57, so the highest standard error is 1.60 times higher than without collinearity.**
+
+8b. Collinearity (PM12)
+```{r}
+#Condition Number
+x3 = model.matrix(PM12)[,-1]
+#Standardize Matrix Columns
+x3 = x3 - matrix(apply(x3, 2, mean), 414,15, byrow=TRUE)
+x3 = x3 / matrix(apply(x3, 2, sd), 414,15, byrow=TRUE)
+e3 = eigen(t(x3) %*% x3)
+sqrt(e3$val[1]/e3$val)
+
+#Variance Inflation Factor
+round(vif(x3), dig=2)
+#Square Rooting
+sqrt(round(vif(x3), digits = 2))
+```
+**The Condition Number = 4.86, so we do not seem to have collinearity. The highest VIF = 3.05, so the highest standard error is 1.75 times higher than without collinearity.**
+
+Lack of Fit Test Between Two Models (M4, PM12)
+```{r}
+anova(M4, PM12)
+```
+**According to the test there does not appear to be a lack of fit with M4.**
